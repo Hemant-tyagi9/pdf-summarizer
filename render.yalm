@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: pdf-summarizer
+    env: python
+    buildCommand: ""
+    startCommand: gunicorn app:app
+    envVars:
+      - key: COHERE_API_KEY
+        value: IpxWRD7rwLgJyqlTBLS2zFxzMvZ2nMGJPneQn1Ev
