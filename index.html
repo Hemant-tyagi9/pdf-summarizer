@@ -51,7 +51,7 @@
       </button>
     </div>
 
-    <form id="uploadForm" enctype="multipart/form-data">
+    <form id="uploadForm" enctype="multipart/form-data" action="/summarize" method="POST">
       <div id="dropZone" class="drop-zone mb-3">
         <p class="mb-0">Drag & Drop your PDF here or click to select</p>
         <input type="file" name="pdf" id="pdfInput" accept="application/pdf" hidden required />
@@ -144,11 +144,12 @@
 
       spinner.style.display = "inline-block";
       form.querySelector("button").disabled = true;
+      resultsContainer.innerHTML = ""; // Clear previous results
 
       const formData = new FormData(form);
       const xhr = new XMLHttpRequest();
 
-      xhr.open("POST", form.action || "#", true);
+      xhr.open("POST", "/summarize", true);
 
       xhr.upload.addEventListener("progress", function (e) {
         if (e.lengthComputable) {
@@ -163,14 +164,58 @@
         uploadProgress.style.width = "0%";
 
         if (xhr.status === 200) {
-          resultsContainer.innerHTML = `
-            <div class="summary-box">
-              <h5 class="mb-3">Summary</h5>
-              <p>${xhr.responseText}</p>
-            </div>
-          `;
+          try {
+            const data = JSON.parse(xhr.responseText);
+
+            // Create summary box
+            const summaryBox = document.createElement('div');
+            summaryBox.className = 'summary-box';
+
+            const title = document.createElement('h5');
+            title.textContent = 'Summary';
+
+            const summaryParagraph = document.createElement('p');
+            summaryParagraph.textContent = data.summary || "No summary returned.";
+
+            // Download buttons
+            const btnContainer = document.createElement('div');
+            btnContainer.className = 'mt-3';
+
+            const btnTxt = document.createElement('button');
+            btnTxt.className = 'btn btn-outline-primary btn-sm me-2';
+            btnTxt.textContent = 'Download TXT';
+            btnTxt.type = 'button';
+            btnTxt.onclick = () => {
+              window.open(`/download/txt/${encodeURIComponent(data.filename)}?summary=${encodeURIComponent(data.summary)}`, '_blank');
+            };
+
+            const btnPdf = document.createElement('button');
+            btnPdf.className = 'btn btn-outline-primary btn-sm';
+            btnPdf.textContent = 'Download PDF';
+            btnPdf.type = 'button';
+            btnPdf.onclick = () => {
+              window.open(`/download/pdf/${encodeURIComponent(data.filename)}?summary=${encodeURIComponent(data.summary)}`, '_blank');
+            };
+
+            btnContainer.appendChild(btnTxt);
+            btnContainer.appendChild(btnPdf);
+
+            summaryBox.appendChild(title);
+            summaryBox.appendChild(summaryParagraph);
+            summaryBox.appendChild(btnContainer);
+
+            resultsContainer.appendChild(summaryBox);
+
+          } catch (err) {
+            showAlert("Failed to parse server response.", "danger");
+          }
         } else {
-          showAlert("An error occurred while processing the file. Please try again.", "danger");
+          let errMsg = "An error occurred while processing the file. Please try again.";
+          try {
+            const errData = JSON.parse(xhr.responseText);
+            if (errData.error) errMsg = errData.error;
+          } catch {}
+          showAlert(errMsg, "danger");
         }
       };
 
