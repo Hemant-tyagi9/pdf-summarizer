@@ -5,10 +5,12 @@ import json
 from datetime import datetime
 from fpdf import FPDF
 import cohere
+from flask_cors import CORS  # ✅ Added
 
 # Flask setup
 app = Flask(__name__, static_folder='.', static_url_path='')
 app.secret_key = 'IpxWRD7rwLgJyqlTBLS2zFxzMvZ2nMGJPneQn1Ev'
+CORS(app)  # ✅ Allow CORS for local frontend
 
 # Config
 UPLOAD_FOLDER = 'uploads'
@@ -16,7 +18,7 @@ SUMMARY_FOLDER = 'summaries'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(SUMMARY_FOLDER, exist_ok=True)
 
-# Cohere setup (✅ Replace with your key)
+# Cohere setup
 cohere_client = cohere.Client("IpxWRD7rwLgJyqlTBLS2zFxzMvZ2nMGJPneQn1Ev")
 
 def get_summary(text):
