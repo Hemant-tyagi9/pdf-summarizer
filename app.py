@@ -8,7 +8,7 @@ import requests
 app = Flask(__name__)
 CORS(app)
 
-COHERE_API_KEY = os.getenv("COHERE_API_KEY")
+COHERE_API_KEY = "IpxWRD7rwLgJyqlTBLS2zFxzMvZ2nMGJPneQn1Ev"
 COHERE_API_URL = "https://api.cohere.ai/v1/generate"
 
 def extract_text_from_pdf(file_path, start_page, end_page):
