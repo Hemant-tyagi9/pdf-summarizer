@@ -146,36 +146,6 @@
   .upload-animation {
     animation: pulse 1.5s infinite;
   }
-
-  /* Custom scrollbar */
-  ::-webkit-scrollbar {
-    width: 8px;
-  }
-  ::-webkit-scrollbar-track {
-    background: var(--bs-light);
-  }
-  ::-webkit-scrollbar-thumb {
-    background: var(--primary-color);
-    border-radius: 4px;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: var(--primary-hover);
-  }
-
-  /* Tooltip styles */
-  .tooltip-inner {
-    background-color: var(--bs-dark);
-  }
-  .bs-tooltip-auto[data-popper-placement^=top] .tooltip-arrow::before,
-  .bs-tooltip-top .tooltip-arrow::before {
-    border-top-color: var(--bs-dark);
-  }
-
-  /* Custom checkbox for advanced options */
-  .form-check-input:checked {
-    background-color: var(--primary-color);
-    border-color: var(--primary-color);
-  }
 </style>
 </head>
 <body>
@@ -186,7 +156,7 @@
         <p class="text-muted mb-0">AI-powered PDF summarization tool</p>
       </div>
       <div>
-        <button id="toggle-theme" class="btn btn-outline-secondary btn-sm" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Toggle theme">
+        <button id="toggle-theme" class="btn btn-outline-secondary btn-sm">
           <i class="bi bi-moon-fill"></i> Dark Mode
         </button>
       </div>
@@ -220,33 +190,6 @@
         </div>
       </div>
 
-      <div class="mb-4">
-        <div class="form-check form-switch">
-          <input class="form-check-input" type="checkbox" id="advanced-options" data-bs-toggle="collapse" data-bs-target="#advancedOptions">
-          <label class="form-check-label" for="advanced-options">Advanced Options</label>
-        </div>
-        <div id="advancedOptions" class="collapse mt-3">
-          <div class="card card-body bg-transparent border-secondary">
-            <div class="mb-3">
-              <label class="form-label">Summary Length</label>
-              <select name="summary_length" class="form-select">
-                <option value="short">Short (Key Points)</option>
-                <option value="medium" selected>Medium (Concise)</option>
-                <option value="long">Detailed</option>
-              </select>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">Output Format</label>
-              <select name="output_format" class="form-select">
-                <option value="paragraph">Paragraph</option>
-                <option value="bullet" selected>Bullet Points</option>
-                <option value="markdown">Markdown</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div class="text-center">
         <button id="submit-btn" class="btn btn-primary px-4 py-2" type="submit" disabled>
           <i class="bi bi-magic me-2"></i>Generate Summary
@@ -273,19 +216,10 @@
   <footer class="footer">
     <div class="container">
       <p class="mb-0">© 2023 PDF SmartNotes | AI-powered document summarization</p>
-      <p class="mt-1 mb-0 small">v1.2.0</p>
     </div>
   </footer>
 
   <script>
-    // Initialize tooltips
-    document.addEventListener('DOMContentLoaded', function() {
-      const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-      tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl);
-      });
-    });
-
     // DOM Elements
     const dropZone = document.getElementById("drop-zone");
     const pdfInput = document.getElementById("pdf-input");
@@ -299,145 +233,111 @@
     const themeToggle = document.getElementById("toggle-theme");
     const html = document.documentElement;
     const resultsContainer = document.getElementById("results-container");
-    const progressBar = document.getElementById("progress-bar");
     const uploadProgress = document.getElementById("upload-progress");
 
-    // Event Listeners
-    dropZone.addEventListener("click", () => pdfInput.click());
-    clearFileBtn.addEventListener("click", clearFile);
+    // Initialize file selection functionality
+    function initFileSelection() {
+      // Click handler for drop zone
+      dropZone.addEventListener("click", (e) => {
+        // Only trigger file input if not clicking on child elements
+        if (e.target === dropZone || e.target.classList.contains("bi-cloud-arrow-up-fill") || 
+            e.target.tagName === "H5" || e.target.tagName === "P") {
+          pdfInput.click();
+        }
+      });
 
-    pdfInput.addEventListener("change", (e) => {
-      if (e.target.files.length) {
-        handleFileSelection(e.target.files[0]);
-      }
-    });
+      // File input change handler
+      pdfInput.addEventListener("change", (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+          handleFileSelection(e.target.files[0]);
+        }
+      });
 
-    // Drag and drop functionality
-    ["dragover", "dragenter"].forEach(event => {
-      dropZone.addEventListener(event, (e) => {
+      // Clear file handler
+      clearFileBtn.addEventListener("click", (e) => {
+        e.stopPropagation(); // Prevent triggering drop zone click
+        clearFile();
+      });
+
+      // Drag and drop handlers
+      dropZone.addEventListener("dragover", (e) => {
         e.preventDefault();
+        e.stopPropagation();
         dropZone.classList.add("dragover", "upload-animation");
       });
-    });
 
-    ["dragleave", "dragend"].forEach(event => {
-      dropZone.addEventListener(event, () => {
-        dropZone.classList.remove("dragover", "upload-animation");
-      });
-    });
-
-    dropZone.addEventListener("drop", (e) => {
-      e.preventDefault();
-      dropZone.classList.remove("dragover", "upload-animation");
-      
-      if (e.dataTransfer.files.length) {
-        const file = e.dataTransfer.files[0];
-        if (file.type === "application/pdf") {
-          pdfInput.files = e.dataTransfer.files;
-          handleFileSelection(file);
-        } else {
-          showAlert("Please select a PDF file", "danger");
-        }
-      }
-    });
-
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      spinner.style.display = "block";
-      submitBtn.disabled = true;
-      resultsContainer.innerHTML = "";
-      
-      try {
-        const formData = new FormData(form);
-        const xhr = new XMLHttpRequest();
-        
-        xhr.upload.addEventListener("progress", (e) => {
-          if (e.lengthComputable) {
-            const percentComplete = (e.loaded / e.total) * 100;
-            uploadProgress.style.width = `${percentComplete}%`;
-          }
+      ["dragleave", "dragend"].forEach((event) => {
+        dropZone.addEventListener(event, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropZone.classList.remove("dragover", "upload-animation");
         });
-        
-        xhr.open("POST", "/", true);
-        xhr.onreadystatechange = function() {
-          if (xhr.readyState === 4) {
-            if (xhr.status === 200) {
-              const parser = new DOMParser();
-              const doc = parser.parseFromString(xhr.responseText, "text/html");
-              
-              // Extract the summary and text from the response
-              const summaryBox = doc.querySelector(".summary-box");
-              if (summaryBox) {
-                resultsContainer.innerHTML = summaryBox.outerHTML;
-                
-                // Add event listeners to new download buttons
-                document.querySelectorAll(".download-btn").forEach(btn => {
-                  btn.addEventListener("click", (e) => {
-                    e.preventDefault();
-                    window.open(btn.href, "_blank");
-                  });
-                });
-              }
-            } else {
-              throw new Error("Server error");
-            }
+      });
+
+      dropZone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.remove("dragover", "upload-animation");
+
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          const file = e.dataTransfer.files[0];
+          if (file.type === "application/pdf" || file.name.endsWith('.pdf')) {
+            // Create a new DataTransfer to set the file
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+            pdfInput.files = dataTransfer.files;
+            handleFileSelection(file);
+          } else {
+            showAlert("Please select a PDF file", "danger");
           }
-        };
-        
-        xhr.send(formData);
-      } catch (error) {
-        console.error("Error:", error);
-        showAlert("Error processing your file. Please try again.", "danger");
-      } finally {
-        spinner.style.display = "none";
-        submitBtn.disabled = false;
-        uploadProgress.style.width = "0%";
-      }
-    });
+        }
+      });
+    }
 
-    // Theme toggle
-    themeToggle.addEventListener("click", () => {
-      const isDark = html.getAttribute("data-bs-theme") === "dark";
-      html.setAttribute("data-bs-theme", isDark ? "light" : "dark");
-      themeToggle.innerHTML = isDark 
-        ? '<i class="bi bi-sun-fill"></i> Light Mode' 
-        : '<i class="bi bi-moon-fill"></i> Dark Mode';
-      localStorage.setItem("theme", isDark ? "light" : "dark");
-    });
-
-    // Functions
+    // Handle file selection
     function handleFileSelection(file) {
+      if (!file) return;
+
+      // Validate file type
+      if (!(file.type === "application/pdf" || file.name.endsWith('.pdf'))) {
+        showAlert("Please select a valid PDF file", "danger");
+        return;
+      }
+
+      // Validate file size (10MB limit)
+      if (file.size > 10 * 1024 * 1024) {
+        showAlert("File exceeds 10MB limit. Please choose a smaller file.", "danger");
+        return;
+      }
+
+      // Update UI
       fileName.textContent = file.name;
       fileSize.textContent = formatFileSize(file.size);
       fileInfo.style.display = "flex";
       clearFileBtn.style.display = "inline-block";
       dropZone.classList.add("has-file");
       submitBtn.disabled = false;
-      
-      // Validate file size (10MB limit)
-      if (file.size > 10 * 1024 * 1024) {
-        showAlert("File exceeds 10MB limit. Please choose a smaller file.", "danger");
-        clearFile();
-      }
     }
 
+    // Clear selected file
     function clearFile() {
       pdfInput.value = "";
       fileInfo.style.display = "none";
       clearFileBtn.style.display = "none";
       dropZone.classList.remove("has-file");
       submitBtn.disabled = true;
-      progressBar.style.width = "0%";
     }
 
+    // Format file size
     function formatFileSize(bytes) {
       if (bytes === 0) return "0 Bytes";
       const k = 1024;
       const sizes = ["Bytes", "KB", "MB", "GB"];
       const i = Math.floor(Math.log(bytes) / Math.log(k));
-      return parseFloat((bytes / Math.pow(k, i)).toFixed(1) + " " + sizes[i];
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
     }
 
+    // Show alert message
     function showAlert(message, type) {
       // Remove existing alerts first
       const existingAlerts = document.querySelectorAll(".alert");
@@ -459,12 +359,94 @@
       }, 5000);
     }
 
-    // Initialize theme from localStorage
-    const savedTheme = localStorage.getItem("theme") || "light";
-    html.setAttribute("data-bs-theme", savedTheme);
-    themeToggle.innerHTML = savedTheme === "dark" 
-      ? '<i class="bi bi-sun-fill"></i> Light Mode' 
-      : '<i class="bi bi-moon-fill"></i> Dark Mode';
+    // Form submission handler
+    function initFormSubmission() {
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        
+        if (!pdfInput.files || pdfInput.files.length === 0) {
+          showAlert("Please select a PDF file first", "danger");
+          return;
+        }
+
+        spinner.style.display = "block";
+        submitBtn.disabled = true;
+        resultsContainer.innerHTML = "";
+        
+        try {
+          const formData = new FormData(form);
+          const xhr = new XMLHttpRequest();
+          
+          xhr.upload.addEventListener("progress", (e) => {
+            if (e.lengthComputable) {
+              const percentComplete = (e.loaded / e.total) * 100;
+              uploadProgress.style.width = `${percentComplete}%`;
+            }
+          });
+          
+          xhr.open("POST", "/", true);
+          xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4) {
+              if (xhr.status === 200) {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(xhr.responseText, "text/html");
+                
+                // Extract the summary and text from the response
+                const summaryBox = doc.querySelector(".summary-box");
+                if (summaryBox) {
+                  resultsContainer.innerHTML = summaryBox.outerHTML;
+                  
+                  // Add event listeners to new download buttons
+                  document.querySelectorAll(".download-btn").forEach(btn => {
+                    btn.addEventListener("click", (e) => {
+                      e.preventDefault();
+                      window.open(btn.href, "_blank");
+                    });
+                  });
+                }
+              } else {
+                throw new Error("Server error");
+              }
+            }
+          };
+          
+          xhr.send(formData);
+        } catch (error) {
+          console.error("Error:", error);
+          showAlert("Error processing your file. Please try again.", "danger");
+        } finally {
+          spinner.style.display = "none";
+          submitBtn.disabled = false;
+          uploadProgress.style.width = "0%";
+        }
+      });
+    }
+
+    // Theme toggle
+    function initThemeToggle() {
+      themeToggle.addEventListener("click", () => {
+        const isDark = html.getAttribute("data-bs-theme") === "dark";
+        html.setAttribute("data-bs-theme", isDark ? "light" : "dark");
+        themeToggle.innerHTML = isDark 
+          ? '<i class="bi bi-sun-fill"></i> Light Mode' 
+          : '<i class="bi bi-moon-fill"></i> Dark Mode';
+        localStorage.setItem("theme", isDark ? "light" : "dark");
+      });
+
+      // Initialize theme from localStorage
+      const savedTheme = localStorage.getItem("theme") || "light";
+      html.setAttribute("data-bs-theme", savedTheme);
+      themeToggle.innerHTML = savedTheme === "dark" 
+        ? '<i class="bi bi-sun-fill"></i> Light Mode' 
+        : '<i class="bi bi-moon-fill"></i> Dark Mode';
+    }
+
+    // Initialize all functionality
+    document.addEventListener("DOMContentLoaded", () => {
+      initFileSelection();
+      initFormSubmission();
+      initThemeToggle();
+    });
   </script>
   
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
