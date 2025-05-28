@@ -5,149 +5,354 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>PDF SmartNotes</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
   <style>
+  :root {
+    --primary-color: #4361ee;
+    --primary-hover: #3a56d4;
+    --transition-speed: 0.3s;
+  }
+
   body {
     background-color: var(--bs-body-bg);
     color: var(--bs-body-color);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
   }
 
-  html[data-bs-theme='dark'] body {
-    background-color: #121212; /* Darker background */
-    color: #f1f1f1;             /* Light text */
+  html[data-bs-theme='dark'] {
+    --bs-body-bg: #121212;
+    --bs-body-color: #f1f1f1;
+    --bs-secondary: #555;
+    --bs-light: #1e1e1e;
+  }
+
+  .main-container {
+    flex: 1;
+    padding-bottom: 3rem;
   }
 
   .drop-zone {
     border: 2px dashed var(--bs-secondary);
-    padding: 30px;
+    padding: 2.5rem;
     text-align: center;
-    border-radius: 10px;
+    border-radius: 12px;
     background-color: var(--bs-light);
     cursor: pointer;
-    transition: border-color 0.3s, background-color 0.3s;
+    transition: all var(--transition-speed) ease;
+    margin-bottom: 1.5rem;
+    position: relative;
+    overflow: hidden;
   }
 
-  html[data-bs-theme='dark'] .drop-zone {
-    background-color: #1e1e1e;
-    border-color: #555;
-    color: #ddd;
+  .drop-zone:hover {
+    border-color: var(--primary-color);
+    transform: translateY(-2px);
+  }
+
+  .drop-zone.dragover {
+    background-color: rgba(67, 97, 238, 0.1);
+    border-color: var(--primary-color);
+  }
+
+  .drop-zone.has-file {
+    border-color: var(--bs-success);
+  }
+
+  .file-info {
+    display: none;
+    margin-top: 1rem;
+    font-size: 0.9rem;
   }
 
   .summary-box {
     background: var(--bs-light);
-    border-radius: 8px;
-    padding: 20px;
-    margin-top: 20px;
-    box-shadow: 0 0 10px rgba(0,0,0,0.05);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-top: 2rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    transition: all var(--transition-speed) ease;
   }
 
-  html[data-bs-theme='dark'] .summary-box {
-    background-color: #1c1c1c;
-    color: #eee;
-    box-shadow: 0 0 10px rgba(255,255,255,0.05);
+  .summary-box:hover {
+    box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+    transform: translateY(-2px);
   }
 
-  .spinner {
+  .spinner-container {
     display: none;
-    margin: 20px auto;
+    margin: 2rem auto;
     text-align: center;
+  }
+
+  .btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    padding: 0.5rem 1.75rem;
+    font-weight: 500;
+    transition: all var(--transition-speed) ease;
+  }
+
+  .btn-primary:hover {
+    background-color: var(--primary-hover);
+    border-color: var(--primary-hover);
+    transform: translateY(-2px);
+  }
+
+  .footer {
+    padding: 1.5rem 0;
+    margin-top: auto;
+    text-align: center;
+    font-size: 0.9rem;
+    color: var(--bs-secondary);
+  }
+
+  @media (max-width: 768px) {
+    .drop-zone {
+      padding: 1.5rem;
+    }
+  }
+
+  /* Animation for file upload */
+  @keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+    100% { transform: scale(1); }
+  }
+
+  .upload-animation {
+    animation: pulse 1.5s infinite;
   }
 </style>
 </head>
-<body class="px-2 px-md-5 py-4">
+<body>
+  <div class="main-container container px-3 px-md-5 py-4">
+    <header class="d-flex justify-content-between align-items-center mb-5">
+      <div>
+        <h2 class="mb-1"><i class="bi bi-file-earmark-text-fill me-2"></i>PDF SmartNotes</h2>
+        <p class="text-muted mb-0">AI-powered PDF summarization tool</p>
+      </div>
+      <div>
+        <button id="toggle-theme" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-moon-fill"></i> Dark Mode
+        </button>
+      </div>
+    </header>
 
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>📄 PDF SmartNotes</h2>
-    <div>
-      <button id="toggle-theme" class="btn btn-outline-secondary btn-sm">🌙 Dark Mode</button>
+    <form id="pdf-form" method="POST" enctype="multipart/form-data">
+      <div id="drop-zone" class="drop-zone">
+        <i class="bi bi-cloud-arrow-up-fill display-4 text-muted mb-3"></i>
+        <h5 class="mb-2">Drag & drop your PDF here</h5>
+        <p class="text-muted mb-3">or click to browse files</p>
+        <input type="file" name="pdf" id="pdf-input" accept=".pdf" hidden required />
+        <div id="file-info" class="file-info">
+          <i class="bi bi-file-earmark-pdf-fill text-danger"></i>
+          <span id="file-name" class="ms-2 fw-medium"></span>
+          <span id="file-size" class="ms-2 text-muted"></span>
+        </div>
+        <button type="button" id="clear-file" class="btn btn-sm btn-outline-danger mt-2" style="display: none;">
+          <i class="bi bi-x-lg"></i> Remove
+        </button>
+      </div>
+
+      <div class="row mb-4">
+        <div class="col-md-6 mb-2 mb-md-0">
+          <label class="form-label">Start Page (optional)</label>
+          <input type="number" name="start_page" class="form-control" placeholder="e.g. 1" min="1">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">End Page (optional)</label>
+          <input type="number" name="end_page" class="form-control" placeholder="e.g. 10" min="1">
+        </div>
+      </div>
+
+      <div class="text-center">
+        <button id="submit-btn" class="btn btn-primary px-4" type="submit" disabled>
+          <i class="bi bi-magic me-2"></i>Generate Summary
+        </button>
+      </div>
+
+      <div class="spinner-container" id="loading-spinner">
+        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-3 fw-medium">Processing your document...</p>
+        <p class="text-muted">This may take a moment depending on file size</p>
+      </div>
+    </form>
+
+    <div id="results-container">
+      <!-- Results will be inserted here dynamically -->
     </div>
   </div>
 
-  <form id="pdf-form" method="POST" enctype="multipart/form-data">
-    <div id="drop-zone" class="drop-zone mb-3">
-      <p>📥 Drag and drop your PDF here or click to select</p>
-      <input type="file" name="pdf" id="pdf-input" hidden required />
+  <footer class="footer">
+    <div class="container">
+      <p class="mb-0">© 2023 PDF SmartNotes | AI-powered document summarization</p>
     </div>
-
-    <div class="row mb-3">
-      <div class="col-md-6">
-        <input type="number" name="start_page" class="form-control" placeholder="Start Page (optional)">
-      </div>
-      <div class="col-md-6">
-        <input type="number" name="end_page" class="form-control" placeholder="End Page (optional)">
-      </div>
-    </div>
-
-    <div class="text-center">
-      <button class="btn btn-primary px-4" type="submit">Generate Summary</button>
-    </div>
-
-    <div class="spinner" id="loading-spinner">
-      <div class="spinner-border text-primary" role="status">
-        <span class="visually-hidden">Loading...</span>
-      </div>
-      <p class="mt-2">Generating summary...</p>
-    </div>
-  </form>
-
-  {% if extracted_text %}
-  <div class="summary-box">
-    <h5 class="fw-bold">📝 Extracted Text:</h5>
-    <pre style="white-space: pre-wrap;">{{ extracted_text }}</pre>
-  </div>
-  {% endif %}
-
-  {% if summary %}
-  <div class="summary-box">
-    <h5 class="fw-bold">📑 Summary for: {{ filename }}</h5>
-    <p>{{ summary }}</p>
-    <div class="mt-3">
-      <a href="/download_txt/{{ filename }}?summary={{ summary }}" class="btn btn-outline-secondary btn-sm">Download TXT</a>
-      <a href="/download_pdf/{{ filename }}?summary={{ summary }}" class="btn btn-outline-success btn-sm">Download PDF</a>
-    </div>
-  </div>
-  {% endif %}
+  </footer>
 
   <script>
+    // DOM Elements
     const dropZone = document.getElementById("drop-zone");
-    const input = document.getElementById("pdf-input");
+    const pdfInput = document.getElementById("pdf-input");
+    const fileInfo = document.getElementById("file-info");
+    const fileName = document.getElementById("file-name");
+    const fileSize = document.getElementById("file-size");
+    const clearFileBtn = document.getElementById("clear-file");
+    const submitBtn = document.getElementById("submit-btn");
     const form = document.getElementById("pdf-form");
     const spinner = document.getElementById("loading-spinner");
     const themeToggle = document.getElementById("toggle-theme");
     const html = document.documentElement;
+    const resultsContainer = document.getElementById("results-container");
 
-    dropZone.addEventListener("click", () => input.click());
+    // Event Listeners
+    dropZone.addEventListener("click", () => pdfInput.click());
+    clearFileBtn.addEventListener("click", clearFile);
 
-    dropZone.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      dropZone.classList.add("dragover");
+    pdfInput.addEventListener("change", (e) => {
+      if (e.target.files.length) {
+        handleFileSelection(e.target.files[0]);
+      }
     });
 
-    dropZone.addEventListener("dragleave", () => {
-      dropZone.classList.remove("dragover");
+    // Drag and drop functionality
+    ["dragover", "dragenter"].forEach(event => {
+      dropZone.addEventListener(event, (e) => {
+        e.preventDefault();
+        dropZone.classList.add("dragover", "upload-animation");
+      });
+    });
+
+    ["dragleave", "dragend"].forEach(event => {
+      dropZone.addEventListener(event, () => {
+        dropZone.classList.remove("dragover", "upload-animation");
+      });
     });
 
     dropZone.addEventListener("drop", (e) => {
       e.preventDefault();
-      dropZone.classList.remove("dragover");
-      const file = e.dataTransfer.files[0];
-      if (file && file.type === "application/pdf") {
-        input.files = e.dataTransfer.files;
-      } else {
-        alert("Please drop a valid PDF file.");
+      dropZone.classList.remove("dragover", "upload-animation");
+      
+      if (e.dataTransfer.files.length) {
+        const file = e.dataTransfer.files[0];
+        if (file.type === "application/pdf") {
+          pdfInput.files = e.dataTransfer.files;
+          handleFileSelection(file);
+        } else {
+          showAlert("Please select a PDF file", "danger");
+        }
       }
     });
 
-    form.addEventListener("submit", () => {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
       spinner.style.display = "block";
+      resultsContainer.innerHTML = "";
+      
+      try {
+        const formData = new FormData(form);
+        const response = await fetch("/", {
+          method: "POST",
+          body: formData
+        });
+        
+        if (response.ok) {
+          const result = await response.text();
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(result, "text/html");
+          
+          // Extract the summary and text from the response
+          const summaryBox = doc.querySelector(".summary-box");
+          if (summaryBox) {
+            resultsContainer.innerHTML = summaryBox.outerHTML;
+            
+            // Add event listeners to new download buttons
+            document.querySelectorAll(".download-btn").forEach(btn => {
+              btn.addEventListener("click", (e) => {
+                e.preventDefault();
+                window.open(btn.href, "_blank");
+              });
+            });
+          }
+        } else {
+          throw new Error("Server error");
+        }
+      } catch (error) {
+        showAlert("Error processing your file. Please try again.", "danger");
+      } finally {
+        spinner.style.display = "none";
+      }
     });
 
     // Theme toggle
     themeToggle.addEventListener("click", () => {
       const isDark = html.getAttribute("data-bs-theme") === "dark";
       html.setAttribute("data-bs-theme", isDark ? "light" : "dark");
-      themeToggle.textContent = isDark ? "🌙 Dark Mode" : "☀️ Light Mode";
+      themeToggle.innerHTML = isDark 
+        ? '<i class="bi bi-moon-fill"></i> Dark Mode' 
+        : '<i class="bi bi-sun-fill"></i> Light Mode';
+      localStorage.setItem("theme", isDark ? "light" : "dark");
     });
-  </script>
 
+    // Functions
+    function handleFileSelection(file) {
+      fileName.textContent = file.name;
+      fileSize.textContent = formatFileSize(file.size);
+      fileInfo.style.display = "block";
+      clearFileBtn.style.display = "inline-block";
+      dropZone.classList.add("has-file");
+      submitBtn.disabled = false;
+      
+      // Validate file size (10MB limit)
+      if (file.size > 10 * 1024 * 1024) {
+        showAlert("File exceeds 10MB limit. Please choose a smaller file.", "danger");
+        clearFile();
+      }
+    }
+
+    function clearFile() {
+      pdfInput.value = "";
+      fileInfo.style.display = "none";
+      clearFileBtn.style.display = "none";
+      dropZone.classList.remove("has-file");
+      submitBtn.disabled = true;
+    }
+
+    function formatFileSize(bytes) {
+      if (bytes === 0) return "0 Bytes";
+      const k = 1024;
+      const sizes = ["Bytes", "KB", "MB", "GB"];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1) + " " + sizes[i];
+    }
+
+    function showAlert(message, type) {
+      const alertDiv = document.createElement("div");
+      alertDiv.className = `alert alert-${type} alert-dismissible fade show mt-3`;
+      alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      `;
+      resultsContainer.prepend(alertDiv);
+      
+      // Auto-dismiss after 5 seconds
+      setTimeout(() => {
+        const bsAlert = new bootstrap.Alert(alertDiv);
+        bsAlert.close();
+      }, 5000);
+    }
+
+    // Initialize theme from localStorage
+    const savedTheme = localStorage.getItem("theme") || "light";
+    html.setAttribute("data-bs-theme", savedTheme);
+    themeToggle.innerHTML = savedTheme === "dark" 
+      ? '<i class="bi bi-sun-fill"></i> Light Mode' 
+      : '<i class="bi bi-moon-fill"></i> Dark Mode';
+  </script>
+  
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
