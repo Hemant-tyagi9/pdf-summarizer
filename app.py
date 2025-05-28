@@ -1,103 +1,68 @@
-from flask import Flask, render_template, request, jsonify, send_file
 import fitz  # PyMuPDF
-import os
-import json
-from datetime import datetime
-from fpdf import FPDF
-import cohere
-from flask_cors import CORS  # ✅ Added
+import requests
+from flask import Flask, request, jsonify, abort
 
-# Flask setup
-app = Flask(__name__, static_folder='.', static_url_path='')
-app.secret_key = 'IpxWRD7rwLgJyqlTBLS2zFxzMvZ2nMGJPneQn1Ev'
-CORS(app)  # ✅ Allow CORS for local frontend
+app = Flask(__name__)
 
-# Config
-UPLOAD_FOLDER = 'uploads'
-SUMMARY_FOLDER = 'summaries'
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(SUMMARY_FOLDER, exist_ok=True)
+API_KEY = "IpxWRD7rwLgJyqlTBLS2zFxzMvZ2nMGJPneQn1Ev"
+AI_SUMMARY_API_URL = "https://api.your-ai-service.com/v1/summarize"  # Replace with your actual AI endpoint
 
-# Cohere setup
-cohere_client = cohere.Client("IpxWRD7rwLgJyqlTBLS2zFxzMvZ2nMGJPneQn1Ev")
 
-def get_summary(text):
+def extract_text_from_pdf(pdf_stream):
     try:
-        response = cohere_client.generate(
-            model="command",
-            prompt=f"Summarize this document:\n\n{text[:12000]}\n\nSummary:",
-            max_tokens=300,
-            temperature=0.5
-        )
-        return response.generations[0].text.strip()
+        doc = fitz.open(stream=pdf_stream.read(), filetype="pdf")
+        text = ""
+        for page in doc:
+            text += page.get_text()
+        return text
     except Exception as e:
-        return f"Error generating summary: {str(e)}"
+        print("PDF extraction error:", e)
+        return None
 
-def save_summary_to_history(title, summary):
-    history_file = os.path.join(SUMMARY_FOLDER, 'history.json')
-    entry = {
-        'id': datetime.now().strftime("%Y%m%d%H%M%S"),
-        'title': title,
-        'summary': summary,
-        'date': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+def summarize_text(text, language="english"):
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
     }
-    history = []
-    if os.path.exists(history_file):
-        with open(history_file, 'r') as f:
-            history = json.load(f)
-    history.append(entry)
-    with open(history_file, 'w') as f:
-        json.dump(history, f, indent=2)
-
-def generate_pdf(summary, filename):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
-    pdf.cell(200, 10, txt="Document Summary", ln=1, align='C')
-    pdf.multi_cell(0, 10, txt=summary)
-    pdf_path = os.path.join(SUMMARY_FOLDER, filename)
-    pdf.output(pdf_path)
-    return pdf_path
-
-@app.route('/')
-def home():
-    return send_file('index.html')
-
-@app.route('/summarize', methods=['POST'])
-def summarize():
-    if 'pdf' not in request.files:
-        return jsonify({'error': 'No file uploaded'}), 400
-    file = request.files['pdf']
-    if file.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
-    filename = file.filename
-    filepath = os.path.join(UPLOAD_FOLDER, filename)
-    file.save(filepath)
+    data = {
+        "text": text,
+        "language": language
+    }
     try:
-        doc = fitz.open(filepath)
-        text = "".join(page.get_text() for page in doc)
-        doc.close()
+        response = requests.post(AI_SUMMARY_API_URL, json=data, headers=headers, timeout=20)
+        response.raise_for_status()
+        json_data = response.json()
+        # Assuming the summary is in json_data['summary'], adjust if API is different
+        return json_data.get("summary", "No summary returned by API.")
     except Exception as e:
-        return jsonify({'error': f'PDF processing failed: {str(e)}'}), 500
-    summary = get_summary(text)
-    save_summary_to_history(filename, summary)
-    return jsonify({'filename': filename, 'summary': summary})
+        print("AI summary API error:", e)
+        return None
 
-@app.route('/download/<format>/<filename>')
-def download(format, filename):
-    summary = request.args.get('summary', '')
+
+@app.route("/", methods=["POST"])
+def generate_summary():
+    if "pdf" not in request.files:
+        return "No PDF file uploaded", 400
+
+    pdf_file = request.files["pdf"]
+    if pdf_file.filename == "" or not pdf_file.filename.lower().endswith(".pdf"):
+        return "Invalid file type. Please upload a PDF.", 400
+
+    language = request.form.get("language", "english").lower()
+    if language not in ["english", "hindi"]:
+        language = "english"  # default fallback
+
+    text = extract_text_from_pdf(pdf_file)
+    if not text:
+        return "Failed to extract text from PDF.", 500
+
+    summary = summarize_text(text, language)
     if not summary:
-        return jsonify({'error': 'No summary provided'}), 400
-    if format == 'txt':
-        txt_path = os.path.join(SUMMARY_FOLDER, f"{filename}.txt")
-        with open(txt_path, 'w') as f:
-            f.write(summary)
-        return send_file(txt_path, as_attachment=True)
-    elif format == 'pdf':
-        pdf_path = generate_pdf(summary, f"{filename}.pdf")
-        return send_file(pdf_path, as_attachment=True)
-    else:
-        return jsonify({'error': 'Invalid format'}), 400
+        return "Failed to generate summary from AI service.", 500
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=10000)
+    return summary, 200, {"Content-Type": "text/plain; charset=utf-8"}
+
+
+if __name__ == "__main__":
+    app.run(debug=True, port=5000)
