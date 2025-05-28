@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_file, flash, redirect
+from flask import Flask, render_template, request, jsonify, send_file, flash, redirect, send_from_directory
 import fitz  # PyMuPDF
 import os
 import json
@@ -6,117 +6,130 @@ from datetime import datetime
 from fpdf import FPDF
 import cohere
 
-app = Flask(__name__, template_folder='templates')  # Explicitly set template folder
-app.config['TEMPLATES_AUTO_RELOAD'] = True
-app.secret_key = 'your_secret_key'  # Change this for production!
+# Initialize Flask app with root as static folder
+app = Flask(__name__, static_folder='.', static_url_path='')
+app.secret_key = 'your_secret_key_here'  # Change this for production!
+
+# Configuration
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10MB file limit
+UPLOAD_FOLDER = 'uploads'
+SUMMARY_FOLDER = 'summaries'
 
 # Ensure directories exist
-os.makedirs("uploads", exist_ok=True)
-os.makedirs("summaries", exist_ok=True)
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(SUMMARY_FOLDER, exist_ok=True)
 
-# --- Cohere Setup ---
-cohere_api_key = "IpxWRD7rwLgJyqlTBLS2zFxzMvZ2nMGJPneQn1Ev"  # Replace with env var in production
-cohere_client = cohere.Client(cohere_api_key)
+# Initialize Cohere client
+cohere_client = cohere.Client("your_cohere_api_key_here")  # Replace with your key
 
-# --- Helper Functions ---
 def get_summary(text):
-    """Generate summary using Cohere API."""
+    """Generate summary using Cohere API"""
     try:
         response = cohere_client.generate(
             model="command",
-            prompt=f"Summarize this:\n\n{text[:12000]}\n\nSummary:",  # Truncate to avoid token limits
+            prompt=f"Summarize this document:\n\n{text[:12000]}\n\nSummary:",
             max_tokens=300,
             temperature=0.5
         )
         return response.generations[0].text.strip()
     except Exception as e:
-        return f"Error: {str(e)}"
+        return f"Error generating summary: {str(e)}"
 
 def save_summary_to_history(title, summary):
-    """Save summary to JSON history file."""
-    history_file = "summaries/history.json"
+    """Save summary to history JSON file"""
+    history_file = os.path.join(SUMMARY_FOLDER, 'history.json')
     entry = {
-        "id": datetime.now().strftime("%Y%m%d%H%M%S"),
-        "title": title,
-        "summary": summary,
-        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        'id': datetime.now().strftime("%Y%m%d%H%M%S"),
+        'title': title,
+        'summary': summary,
+        'date': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
     
     history = []
     if os.path.exists(history_file):
-        with open(history_file, "r") as f:
+        with open(history_file, 'r') as f:
             history = json.load(f)
     
     history.append(entry)
-    with open(history_file, "w") as f:
+    with open(history_file, 'w') as f:
         json.dump(history, f, indent=2)
 
-def generate_pdf(summary, filename="summary.pdf"):
-    """Convert summary to PDF."""
+def generate_pdf(summary, filename):
+    """Generate PDF from summary text"""
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
-    pdf.cell(200, 10, txt="PDF Summary", ln=1, align='C')
+    pdf.cell(200, 10, txt="Document Summary", ln=1, align='C')
     pdf.multi_cell(0, 10, txt=summary)
-    pdf_path = os.path.join("summaries", filename)
+    pdf_path = os.path.join(SUMMARY_FOLDER, filename)
     pdf.output(pdf_path)
     return pdf_path
 
-# --- Routes ---
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    if request.method == 'POST':
-        # Handle file upload
-        file = request.files['pdf']
-        if not file:
-            flash("No file uploaded!")
-            return redirect(request.url)
-        
-        # Save file
-        filename = file.filename
-        filepath = os.path.join("uploads", filename)
-        file.save(filepath)
-        
-        # Extract text from PDF
+@app.route('/')
+def home():
+    """Serve the main index.html file"""
+    return send_file('index.html')
+
+@app.route('/summarize', methods=['POST'])
+def summarize():
+    """Handle PDF upload and summarization"""
+    if 'pdf' not in request.files:
+        return jsonify({'error': 'No file uploaded'}), 400
+    
+    file = request.files['pdf']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+    
+    # Save uploaded file
+    filename = file.filename
+    filepath = os.path.join(UPLOAD_FOLDER, filename)
+    file.save(filepath)
+    
+    # Extract text from PDF
+    try:
         doc = fitz.open(filepath)
         text = ""
         for page in doc:
             text += page.get_text()
         doc.close()
-        
-        # Generate and save summary
-        summary = get_summary(text)
-        save_summary_to_history(filename, summary)
-        
-        return render_template('index.html', 
-                           summary=summary, 
-                           filename=filename)
+    except Exception as e:
+        return jsonify({'error': f'PDF processing failed: {str(e)}'}), 500
     
-    return render_template('index.html')  # GET request
+    # Generate summary
+    summary = get_summary(text)
+    save_summary_to_history(filename, summary)
+    
+    return jsonify({
+        'filename': filename,
+        'summary': summary
+    })
 
 @app.route('/history')
 def history():
-    """Return summary history as JSON."""
-    history_file = "summaries/history.json"
+    """Get summary history"""
+    history_file = os.path.join(SUMMARY_FOLDER, 'history.json')
     if os.path.exists(history_file):
-        with open(history_file, "r") as f:
+        with open(history_file, 'r') as f:
             return jsonify(json.load(f))
     return jsonify([])
 
 @app.route('/download/<format>/<filename>')
 def download(format, filename):
-    """Download summary as TXT or PDF."""
+    """Download summary in specified format"""
     summary = request.args.get('summary', '')
+    if not summary:
+        return jsonify({'error': 'No summary provided'}), 400
+    
     if format == 'txt':
-        path = os.path.join("summaries", f"{filename}.txt")
-        with open(path, 'w') as f:
+        txt_path = os.path.join(SUMMARY_FOLDER, f"{filename}.txt")
+        with open(txt_path, 'w') as f:
             f.write(summary)
-        return send_file(path, as_attachment=True)
+        return send_file(txt_path, as_attachment=True)
     elif format == 'pdf':
-        path = generate_pdf(summary, f"{filename}.pdf")
-        return send_file(path, as_attachment=True)
-    return "Invalid format", 400
+        pdf_path = generate_pdf(summary, f"{filename}.pdf")
+        return send_file(pdf_path, as_attachment=True)
+    else:
+        return jsonify({'error': 'Invalid format'}), 400
 
-# --- Run the App ---
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=10000, debug=False)  # Render requires host 0.0.0.0
+    app.run(host='0.0.0.0', port=10000, debug=False)
