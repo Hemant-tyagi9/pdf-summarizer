@@ -8,7 +8,7 @@ import cohere
 
 # Initialize Flask app with root as static folder
 app = Flask(__name__, static_folder='.', static_url_path='')
-app.secret_key = 'your_secret_key_here'  # Change this for production!
+app.secret_key = 'IpxWRD7rwLgJyqlTBLS2zFxzMvZ2nMGJPneQn1Ev'  # Change this for production!
 
 # Configuration
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10MB file limit
