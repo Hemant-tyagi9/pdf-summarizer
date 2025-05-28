@@ -1,14 +1,15 @@
-from flask import Flask, request, jsonify, send_file, render_template
+import os
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 import fitz  # PyMuPDF
-import os
 import tempfile
 import requests
 
 app = Flask(__name__)
 CORS(app)
 
-COHERE_API_KEY = "IpxWRD7rwLgJyqlTBLS2zFxzMvZ2nMGJPneQn1Ev"
+# Get the API key from environment variable
+COHERE_API_KEY = os.getenv("COHERE_API_KEY")
 COHERE_API_URL = "https://api.cohere.ai/v1/generate"
 
 def extract_text_from_pdf(file_path, start_page, end_page):
@@ -43,11 +44,6 @@ def generate_summary(text, language="english", length="short", bullets=False):
     else:
         return f"Error from Cohere: {response.status_code}"
 
-@app.route("/")
-def home():
-    # Serve the frontend HTML
-    return render_template("index.html")
-
 @app.route("/summarize", methods=["POST"])
 def summarize():
     if "pdf" not in request.files:
@@ -77,6 +73,10 @@ def summarize():
         "extractedText": extracted_text,
         "summary": summary
     })
+
+@app.route("/")
+def home():
+    return "PDF SmartNotes API is running."
 
 if __name__ == "__main__":
     app.run(debug=True)
