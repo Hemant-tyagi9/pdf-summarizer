@@ -1,454 +1,108 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="light">
+<html lang="en" data-bs-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>PDF SmartNotes</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css"/>
   <style>
-  :root {
-    --primary-color: #4361ee;
-    --primary-hover: #3a56d4;
-    --transition-speed: 0.3s;
-    --success-color: #28a745;
-    --danger-color: #dc3545;
-  }
-
-  body {
-    background-color: var(--bs-body-bg);
-    color: var(--bs-body-color);
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-  }
-
-  html[data-bs-theme='dark'] {
-    --bs-body-bg: #121212;
-    --bs-body-color: #f1f1f1;
-    --bs-secondary: #555;
-    --bs-light: #1e1e1e;
-    --bs-dark: #2d2d2d;
-  }
-
-  .main-container {
-    flex: 1;
-    padding-bottom: 3rem;
-    max-width: 800px;
-    margin: 0 auto;
-  }
-
-  .drop-zone {
-    border: 2px dashed var(--bs-secondary);
-    padding: 2.5rem;
-    text-align: center;
-    border-radius: 12px;
-    background-color: var(--bs-light);
-    cursor: pointer;
-    transition: all var(--transition-speed) ease;
-    margin-bottom: 1.5rem;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .drop-zone:hover {
-    border-color: var(--primary-color);
-    transform: translateY(-2px);
-  }
-
-  .drop-zone.dragover {
-    background-color: rgba(67, 97, 238, 0.1);
-    border-color: var(--primary-color);
-  }
-
-  .drop-zone.has-file {
-    border-color: var(--success-color);
-  }
-
-  .file-info {
-    display: none;
-    margin-top: 1rem;
-    font-size: 0.9rem;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .summary-box {
-    background: var(--bs-light);
-    border-radius: 12px;
-    padding: 1.5rem;
-    margin-top: 2rem;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-    transition: all var(--transition-speed) ease;
-  }
-
-  .summary-box:hover {
-    box-shadow: 0 6px 16px rgba(0,0,0,0.12);
-    transform: translateY(-2px);
-  }
-
-  .spinner-container {
-    display: none;
-    margin: 2rem auto;
-    text-align: center;
-  }
-
-  .btn-primary {
-    background-color: var(--primary-color);
-    border-color: var(--primary-color);
-    padding: 0.5rem 1.75rem;
-    font-weight: 500;
-    transition: all var(--transition-speed) ease;
-  }
-
-  .btn-primary:hover, .btn-primary:focus {
-    background-color: var(--primary-hover);
-    border-color: var(--primary-hover);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-  }
-
-  .footer {
-    padding: 1.5rem 0;
-    margin-top: auto;
-    text-align: center;
-    font-size: 0.9rem;
-    color: var(--bs-secondary);
-    background-color: var(--bs-dark);
-  }
-
-  .progress-bar {
-    height: 6px;
-    background-color: var(--primary-color);
-    width: 0%;
-    transition: width 0.3s ease;
-    margin-top: 0.5rem;
-    border-radius: 3px;
-  }
-
-  @media (max-width: 768px) {
+    body {
+      padding: 20px;
+    }
     .drop-zone {
-      padding: 1.5rem;
+      border: 2px dashed var(--bs-secondary);
+      border-radius: 20px;
+      padding: 40px;
+      text-align: center;
+      transition: background-color 0.3s, border-color 0.3s;
     }
-    .main-container {
-      padding: 1rem;
+    .drop-zone.dragover {
+      background-color: var(--bs-secondary-bg);
+      border-color: var(--bs-primary);
     }
-  }
-
-  /* Animation for file upload */
-  @keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.02); }
-    100% { transform: scale(1); }
-  }
-
-  .upload-animation {
-    animation: pulse 1.5s infinite;
-  }
-</style>
+    .theme-toggle {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+    }
+  </style>
 </head>
 <body>
-  <div class="main-container container px-3 px-md-5 py-4">
-    <header class="d-flex justify-content-between align-items-center mb-5">
-      <div>
-        <h2 class="mb-1"><i class="bi bi-file-earmark-text-fill me-2"></i>PDF SmartNotes</h2>
-        <p class="text-muted mb-0">AI-powered PDF summarization tool</p>
-      </div>
-      <div>
-        <button id="toggle-theme" class="btn btn-outline-secondary btn-sm">
-          <i class="bi bi-moon-fill"></i> Dark Mode
-        </button>
-      </div>
-    </header>
-
-    <form id="pdf-form" method="POST" enctype="multipart/form-data">
-      <div id="drop-zone" class="drop-zone">
-        <i class="bi bi-cloud-arrow-up-fill display-4 text-muted mb-3"></i>
-        <h5 class="mb-2">Drag & drop your PDF here</h5>
-        <p class="text-muted mb-3">or click to browse files</p>
-        <input type="file" name="pdf" id="pdf-input" accept=".pdf" hidden required />
-        <div id="file-info" class="file-info d-flex align-items-center">
-          <i class="bi bi-file-earmark-pdf-fill text-danger me-2"></i>
-          <span id="file-name" class="fw-medium text-truncate" style="max-width: 200px;"></span>
-          <span id="file-size" class="ms-2 text-muted"></span>
-        </div>
-        <div id="progress-bar" class="progress-bar"></div>
-        <button type="button" id="clear-file" class="btn btn-sm btn-outline-danger mt-2" style="display: none;">
-          <i class="bi bi-x-lg"></i> Remove
-        </button>
-      </div>
-
-      <div class="row mb-4">
-        <div class="col-md-6 mb-2 mb-md-0">
-          <label class="form-label">Start Page (optional)</label>
-          <input type="number" name="start_page" class="form-control" placeholder="e.g. 1" min="1">
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">End Page (optional)</label>
-          <input type="number" name="end_page" class="form-control" placeholder="e.g. 10" min="1">
-        </div>
-      </div>
-
-      <div class="text-center">
-        <button id="submit-btn" class="btn btn-primary px-4 py-2" type="submit" disabled>
-          <i class="bi bi-magic me-2"></i>Generate Summary
-        </button>
-      </div>
-
-      <div class="spinner-container" id="loading-spinner">
-        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
-          <span class="visually-hidden">Loading...</span>
-        </div>
-        <p class="mt-3 fw-medium">Processing your document...</p>
-        <p class="text-muted">This may take a moment depending on file size</p>
-        <div class="progress mt-2" style="height: 6px; width: 60%; margin: 0 auto;">
-          <div id="upload-progress" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
-        </div>
-      </div>
-    </form>
-
-    <div id="results-container" class="mt-4">
-      <!-- Results will be inserted here dynamically -->
+  <div class="container">
+    <button id="toggle-theme" class="btn btn-outline-light theme-toggle">
+      <i class="bi bi-moon-fill"></i> Dark Mode
+    </button>
+    <h1 class="mb-4">PDF SmartNotes</h1>
+    <div id="drop-zone" class="drop-zone">
+      <p class="mb-3">Drag & Drop your PDF file here</p>
+      <p>or</p>
+      <button id="browse-btn" class="btn btn-primary mt-2">Browse</button>
+      <input type="file" id="pdf-input" accept="application/pdf" class="form-control mt-2" style="display:none;" />
     </div>
+    <div id="output" class="mt-4"></div>
   </div>
 
-  <footer class="footer">
-    <div class="container">
-      <p class="mb-0">© 2023 PDF SmartNotes | AI-powered document summarization</p>
-    </div>
-  </footer>
-
+  <!-- Scripts -->
   <script>
-    // DOM Elements
     const dropZone = document.getElementById("drop-zone");
     const pdfInput = document.getElementById("pdf-input");
-    const fileInfo = document.getElementById("file-info");
-    const fileName = document.getElementById("file-name");
-    const fileSize = document.getElementById("file-size");
-    const clearFileBtn = document.getElementById("clear-file");
-    const submitBtn = document.getElementById("submit-btn");
-    const form = document.getElementById("pdf-form");
-    const spinner = document.getElementById("loading-spinner");
-    const themeToggle = document.getElementById("toggle-theme");
+    const browseBtn = document.getElementById("browse-btn");
     const html = document.documentElement;
-    const resultsContainer = document.getElementById("results-container");
-    const uploadProgress = document.getElementById("upload-progress");
+    const themeToggle = document.getElementById("toggle-theme");
 
-    // Initialize file selection functionality
     function initFileSelection() {
-      // Click handler for drop zone
-      dropZone.addEventListener("click", (e) => {
-        // Only trigger file input if not clicking on child elements
-        if (e.target === dropZone || e.target.classList.contains("bi-cloud-arrow-up-fill") || 
-            e.target.tagName === "H5" || e.target.tagName === "P") {
-          pdfInput.click();
-        }
-      });
-
-      // File input change handler
-      pdfInput.addEventListener("change", (e) => {
-        if (e.target.files && e.target.files.length > 0) {
-          handleFileSelection(e.target.files[0]);
-        }
-      });
-
-      // Clear file handler
-      clearFileBtn.addEventListener("click", (e) => {
-        e.stopPropagation(); // Prevent triggering drop zone click
-        clearFile();
-      });
-
-      // Drag and drop handlers
       dropZone.addEventListener("dragover", (e) => {
         e.preventDefault();
-        e.stopPropagation();
-        dropZone.classList.add("dragover", "upload-animation");
+        dropZone.classList.add("dragover");
       });
 
-      ["dragleave", "dragend"].forEach((event) => {
-        dropZone.addEventListener(event, (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          dropZone.classList.remove("dragover", "upload-animation");
-        });
+      dropZone.addEventListener("dragleave", () => {
+        dropZone.classList.remove("dragover");
       });
 
       dropZone.addEventListener("drop", (e) => {
         e.preventDefault();
-        e.stopPropagation();
-        dropZone.classList.remove("dragover", "upload-animation");
+        dropZone.classList.remove("dragover");
+        const file = e.dataTransfer.files[0];
+        if (file && file.type === "application/pdf") {
+          handlePDF(file);
+        }
+      });
 
-        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-          const file = e.dataTransfer.files[0];
-          if (file.type === "application/pdf" || file.name.endsWith('.pdf')) {
-            // Create a new DataTransfer to set the file
-            const dataTransfer = new DataTransfer();
-            dataTransfer.items.add(file);
-            pdfInput.files = dataTransfer.files;
-            handleFileSelection(file);
-          } else {
-            showAlert("Please select a PDF file", "danger");
-          }
+      browseBtn.addEventListener("click", () => pdfInput.click());
+
+      pdfInput.addEventListener("change", () => {
+        const file = pdfInput.files[0];
+        if (file && file.type === "application/pdf") {
+          handlePDF(file);
         }
       });
     }
 
-    // Handle file selection
-    function handleFileSelection(file) {
-      if (!file) return;
-
-      // Validate file type
-      if (!(file.type === "application/pdf" || file.name.endsWith('.pdf'))) {
-        showAlert("Please select a valid PDF file", "danger");
-        return;
-      }
-
-      // Validate file size (10MB limit)
-      if (file.size > 10 * 1024 * 1024) {
-        showAlert("File exceeds 10MB limit. Please choose a smaller file.", "danger");
-        return;
-      }
-
-      // Update UI
-      fileName.textContent = file.name;
-      fileSize.textContent = formatFileSize(file.size);
-      fileInfo.style.display = "flex";
-      clearFileBtn.style.display = "inline-block";
-      dropZone.classList.add("has-file");
-      submitBtn.disabled = false;
+    function handlePDF(file) {
+      const output = document.getElementById("output");
+      output.innerHTML = `<p>Uploaded: ${file.name}</p>`;
+      // Placeholder for future AI summarization logic
     }
 
-    // Clear selected file
-    function clearFile() {
-      pdfInput.value = "";
-      fileInfo.style.display = "none";
-      clearFileBtn.style.display = "none";
-      dropZone.classList.remove("has-file");
-      submitBtn.disabled = true;
-    }
-
-    // Format file size
-    function formatFileSize(bytes) {
-      if (bytes === 0) return "0 Bytes";
-      const k = 1024;
-      const sizes = ["Bytes", "KB", "MB", "GB"];
-      const i = Math.floor(Math.log(bytes) / Math.log(k));
-      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
-    }
-
-    // Show alert message
-    function showAlert(message, type) {
-      // Remove existing alerts first
-      const existingAlerts = document.querySelectorAll(".alert");
-      existingAlerts.forEach(alert => alert.remove());
-      
-      const alertDiv = document.createElement("div");
-      alertDiv.className = `alert alert-${type} alert-dismissible fade show mt-3`;
-      alertDiv.innerHTML = `
-        <i class="bi ${type === 'danger' ? 'bi-exclamation-triangle-fill' : 'bi-info-circle-fill'} me-2"></i>
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-      `;
-      resultsContainer.prepend(alertDiv);
-      
-      // Auto-dismiss after 5 seconds
-      setTimeout(() => {
-        const bsAlert = new bootstrap.Alert(alertDiv);
-        bsAlert.close();
-      }, 5000);
-    }
-
-    // Form submission handler
-    function initFormSubmission() {
-      form.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        
-        if (!pdfInput.files || pdfInput.files.length === 0) {
-          showAlert("Please select a PDF file first", "danger");
-          return;
-        }
-
-        spinner.style.display = "block";
-        submitBtn.disabled = true;
-        resultsContainer.innerHTML = "";
-        
-        try {
-          const formData = new FormData(form);
-          const xhr = new XMLHttpRequest();
-          
-          xhr.upload.addEventListener("progress", (e) => {
-            if (e.lengthComputable) {
-              const percentComplete = (e.loaded / e.total) * 100;
-              uploadProgress.style.width = `${percentComplete}%`;
-            }
-          });
-          
-          xhr.open("POST", "/", true);
-          xhr.onreadystatechange = function() {
-            if (xhr.readyState === 4) {
-              if (xhr.status === 200) {
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(xhr.responseText, "text/html");
-                
-                // Extract the summary and text from the response
-                const summaryBox = doc.querySelector(".summary-box");
-                if (summaryBox) {
-                  resultsContainer.innerHTML = summaryBox.outerHTML;
-                  
-                  // Add event listeners to new download buttons
-                  document.querySelectorAll(".download-btn").forEach(btn => {
-                    btn.addEventListener("click", (e) => {
-                      e.preventDefault();
-                      window.open(btn.href, "_blank");
-                    });
-                  });
-                }
-              } else {
-                throw new Error("Server error");
-              }
-            }
-          };
-          
-          xhr.send(formData);
-        } catch (error) {
-          console.error("Error:", error);
-          showAlert("Error processing your file. Please try again.", "danger");
-        } finally {
-          spinner.style.display = "none";
-          submitBtn.disabled = false;
-          uploadProgress.style.width = "0%";
-        }
-      });
-    }
-
-    // Theme toggle
     function initThemeToggle() {
       themeToggle.addEventListener("click", () => {
         const isDark = html.getAttribute("data-bs-theme") === "dark";
         html.setAttribute("data-bs-theme", isDark ? "light" : "dark");
-        themeToggle.innerHTML = isDark 
-          ? '<i class="bi bi-sun-fill"></i> Light Mode' 
+        themeToggle.innerHTML = isDark
+          ? '<i class="bi bi-sun-fill"></i> Light Mode'
           : '<i class="bi bi-moon-fill"></i> Dark Mode';
-        localStorage.setItem("theme", isDark ? "light" : "dark");
       });
-
-      // Initialize theme from localStorage
-      const savedTheme = localStorage.getItem("theme") || "light";
-      html.setAttribute("data-bs-theme", savedTheme);
-      themeToggle.innerHTML = savedTheme === "dark" 
-        ? '<i class="bi bi-sun-fill"></i> Light Mode' 
-        : '<i class="bi bi-moon-fill"></i> Dark Mode';
     }
 
-    // Initialize all functionality
     document.addEventListener("DOMContentLoaded", () => {
       initFileSelection();
-      initFormSubmission();
       initThemeToggle();
     });
   </script>
-  
+
+  <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
