@@ -8,7 +8,7 @@ import cohere
 
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
-app.secret_key = 'your_secret_key'
+app.secret_key = os.getenv("SECRET_KEY", "your_fallback_secret_key")
 
 # Ensure directories exist
 os.makedirs("uploads", exist_ok=True)
@@ -16,8 +16,8 @@ os.makedirs("summaries", exist_ok=True)
 
 MAX_FILE_SIZE_MB = 10  # Free plan limit
 
-# Direct API key (for local testing only)
-cohere_api_key = "IpxWRD7rwLgJyqlTBLS2zFxzMvZ2nMGJPneQn1Ev"
+# Load Cohere API key from environment
+cohere_api_key = os.getenv("COHERE_API_KEY")
 cohere_client = cohere.Client(cohere_api_key)
 
 def get_summary(text):
